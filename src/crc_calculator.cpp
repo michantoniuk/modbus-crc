@@ -1,6 +1,5 @@
 #include "crc_calculator.h"
 
-// CRC lookup tables
 const uint8_t CRCCalculator::auchCRCHi[] = {
     0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81,
     0x40, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40, 0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0,
@@ -43,7 +42,6 @@ const uint8_t CRCCalculator::auchCRCLo[] = {
     0x40
 };
 
-// Highly optimized CRC-16 calculation
 uint16_t CRCCalculator::calculateCRC16(const std::vector<uint8_t>& data) {
     uint8_t crcHi = 0xFF;
     uint8_t crcLo = 0xFF;
@@ -52,15 +50,12 @@ uint16_t CRCCalculator::calculateCRC16(const std::vector<uint8_t>& data) {
         return (static_cast<uint16_t>(crcLo) << 8) | crcHi;
     }
     
-    // Use pointers for faster access
     const uint8_t* dataPtr = data.data();
     const uint8_t* dataEnd = dataPtr + data.size();
     
-    // Process 8 bytes at a time for maximum throughput
     while (dataPtr + 7 < dataEnd) {
         uint8_t idx;
         
-        // Unrolled loop for 8 bytes - compiler can optimize this heavily
         idx = crcLo ^ *dataPtr++; crcLo = crcHi ^ auchCRCHi[idx]; crcHi = auchCRCLo[idx];
         idx = crcLo ^ *dataPtr++; crcLo = crcHi ^ auchCRCHi[idx]; crcHi = auchCRCLo[idx];
         idx = crcLo ^ *dataPtr++; crcLo = crcHi ^ auchCRCHi[idx]; crcHi = auchCRCLo[idx];
@@ -71,18 +66,15 @@ uint16_t CRCCalculator::calculateCRC16(const std::vector<uint8_t>& data) {
         idx = crcLo ^ *dataPtr++; crcLo = crcHi ^ auchCRCHi[idx]; crcHi = auchCRCLo[idx];
     }
     
-    // Process remaining bytes
     while (dataPtr < dataEnd) {
         uint8_t idx = crcLo ^ *dataPtr++;
         crcLo = crcHi ^ auchCRCHi[idx];
         crcHi = auchCRCLo[idx];
     }
     
-    // Return with bytes in proper order for display
     return (static_cast<uint16_t>(crcLo) << 8) | crcHi;
 }
 
-// Perform timed calculation of CRC with multiple repetitions
 std::pair<uint64_t, uint16_t> CRCCalculator::performTimedCalculation(
     const std::vector<uint8_t>& data, 
     int repetitions
@@ -91,14 +83,11 @@ std::pair<uint64_t, uint16_t> CRCCalculator::performTimedCalculation(
         return {0, 0};
     }
     
-    // Calculate CRC once to get the result
     uint16_t result = calculateCRC16(data);
     
-    // For small repetition counts, don't use multithreading overhead
     if (repetitions < 1000000) {
         auto startTime = std::chrono::high_resolution_clock::now();
         
-        // Just burn through the repetitions in a single thread
         for (int i = 0; i < repetitions; ++i) {
             volatile uint16_t temp = calculateCRC16(data);
             (void)temp;
@@ -110,41 +99,32 @@ std::pair<uint64_t, uint16_t> CRCCalculator::performTimedCalculation(
         return {duration.count(), result};
     }
     
-    // For large repetition counts, use multithreading
-    // Determine number of threads - Use hardware concurrency with some limits
     unsigned int threadCount = std::min(std::max(1u, std::thread::hardware_concurrency()), 16u);
     
-    // Calculate reps per thread
     std::vector<int> repsPerThread(threadCount, repetitions / threadCount);
     
-    // Distribute remainder
     int remainder = repetitions % threadCount;
     for (int i = 0; i < remainder; ++i) {
         repsPerThread[i]++;
     }
     
-    // Setup for multithreaded execution
     std::vector<std::thread> threads;
     std::atomic<int> completedThreads(0);
     std::mutex resultMutex;
     std::condition_variable resultCV;
     bool finished = false;
     
-    // Start timer
     auto startTime = std::chrono::high_resolution_clock::now();
     
-    // Launch threads
     for (unsigned int i = 0; i < threadCount; ++i) {
         threads.emplace_back([&, i]() {
             const int reps = repsPerThread[i];
             
-            // Calculate CRC in a tight loop
             for (int j = 0; j < reps; ++j) {
                 volatile uint16_t temp = calculateCRC16(data);
                 (void)temp;
             }
             
-            // Signal completion
             int completed = ++completedThreads;
             if (completed == static_cast<int>(threadCount)) {
                 std::lock_guard<std::mutex> lock(resultMutex);
@@ -154,17 +134,14 @@ std::pair<uint64_t, uint16_t> CRCCalculator::performTimedCalculation(
         });
     }
     
-    // Wait for all threads to complete
     {
         std::unique_lock<std::mutex> lock(resultMutex);
         resultCV.wait(lock, [&finished]() { return finished; });
     }
     
-    // Calculate elapsed time
     auto endTime = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
     
-    // Join all threads
     for (auto& thread : threads) {
         if (thread.joinable()) {
             thread.join();

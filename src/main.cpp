@@ -6,7 +6,6 @@
 #endif
 
 int main(int argc, char *argv[]) {
-    // Set high priority for this process on Windows
 #ifdef _WIN32
     SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
 #endif

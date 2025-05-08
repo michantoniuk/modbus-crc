@@ -18,14 +18,12 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     QWidget* centralWidget = new QWidget(this);
     QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
     
-    // Input section
     QGroupBox* inputGroupBox = new QGroupBox("Dane wejściowe");
     QFormLayout* inputLayout = new QFormLayout(inputGroupBox);
     
     frameInput = new QLineEdit();
     frameInput->setPlaceholderText("np. 01 10 00 11 00 03 06 1A C4 BA D0");
     
-    // Create validator for hex input
     QRegularExpression hexRegex("^[0-9A-Fa-f\\s]*$");
     QRegularExpressionValidator* hexValidator = new QRegularExpressionValidator(hexRegex, this);
     frameInput->setValidator(hexValidator);
@@ -34,14 +32,12 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     QIntValidator* intValidator = new QIntValidator(1, 1000000000, this);
     repetitionsInput->setValidator(intValidator);
     
-    // Connect Enter key in input fields to start button
     connect(frameInput, &QLineEdit::returnPressed, this, &MainWindow::calculateCRC);
     connect(repetitionsInput, &QLineEdit::returnPressed, this, &MainWindow::calculateCRC);
     
     inputLayout->addRow("Bajty ramki:", frameInput);
     inputLayout->addRow("Liczba powtórzeń:", repetitionsInput);
     
-    // Results section
     QGroupBox* resultsGroupBox = new QGroupBox("Informacje");
     QFormLayout* resultsLayout = new QFormLayout(resultsGroupBox);
     
@@ -53,18 +49,15 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     resultsLayout->addRow("Czas 1 iteracji (ms):", iterationTimeLabel);
     resultsLayout->addRow("Suma kontrolna:", crcLabel);
     
-    // Start button
     startButton = new QPushButton("START");
     connect(startButton, &QPushButton::clicked, this, &MainWindow::calculateCRC);
     
-    // Add widgets to main layout
     mainLayout->addWidget(inputGroupBox);
     mainLayout->addWidget(resultsGroupBox);
     mainLayout->addWidget(startButton);
     
     setCentralWidget(centralWidget);
     
-    // Initial focus
     frameInput->setFocus();
 }
 
@@ -94,33 +87,26 @@ void MainWindow::calculateCRC() {
         return;
     }
     
-    // Disable UI during calculation
     startButton->setEnabled(false);
     frameInput->setEnabled(false);
     repetitionsInput->setEnabled(false);
     
-    // Update UI to show processing state
     QApplication::setOverrideCursor(Qt::WaitCursor);
     totalTimeLabel->setText("Obliczanie...");
     iterationTimeLabel->setText("Obliczanie...");
     crcLabel->setText("Obliczanie...");
     QApplication::processEvents();
     
-    // Use multi-threaded processing for large repetition counts
     auto [totalTimeMs, crcValue] = CRCCalculator::performTimedCalculation(frameBytes, repetitions);
     
-    // Format CRC as hex string (uppercase)
     QString crcString = QString("%1").arg(crcValue, 0, 16).toUpper();
     
-    // Calculate time per iteration
     double iterationTime = static_cast<double>(totalTimeMs) / repetitions;
     
-    // Update UI
     totalTimeLabel->setText(QString::number(totalTimeMs) + " ms");
     iterationTimeLabel->setText(QString::number(iterationTime, 'f', 8) + " ms");
     crcLabel->setText(crcString);
     
-    // Re-enable UI
     QApplication::restoreOverrideCursor();
     startButton->setEnabled(true);
     frameInput->setEnabled(true);
