@@ -14,40 +14,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # First, let's list available Qt versions with correct syntax
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11.9'
-
-      - name: Install aqtinstall
-        run: |
-          python -m pip install --upgrade pip
-          pip install aqtinstall==2.1.*
-
-      - name: List available Qt versions
-        run: |
-          # List all available versions
-          python -m aqt list-qt windows desktop
-          # List architectures for Qt 6.5 (a known version)
-          python -m aqt list-qt windows desktop --arch 6.5.0
-          # List modules for Qt 6.5.0 on win64_msvc2019_64
-          python -m aqt list-qt windows desktop --modules 6.5.0 win64_msvc2019_64
-
-      # Now use the jurplel action with known good parameters
+      # Install Qt using the correct version and modules from the list
       - name: Install Qt
         uses: jurplel/install-qt-action@v3.3.0
         with:
-          version: '6.5.0'  # Using a version we know exists
+          version: '6.4.3'  # This version is available according to the output
           host: 'windows'
           target: 'desktop'
-          arch: 'win64_msvc2019_64'  # This should be available for Qt 6.5
-          modules: 'qtcore qtgui qtwidgets'  # Using correct module names
+          arch: 'win64_msvc2019_64'  # This architecture is available
+          modules: 'qtcharts qtimageformats qtmultimedia'  # Using correct module names from the list
 
       - name: Print Qt environment info
         run: |
           echo "Qt6_DIR: $env:Qt6_DIR"
-          dir $env:Qt6_DIR
+          dir "$env:Qt6_DIR"
 
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1.13.0
@@ -68,14 +48,28 @@ jobs:
       - name: Deploy Qt dependencies
         run: |
           cd build\Release
-          $windeployqt = "$env:Qt6_DIR\bin\windeployqt.exe"
-          if (Test-Path $windeployqt) {
+          
+          # Find windeployqt.exe
+          $windeployqt = $null
+          if (Test-Path "$env:Qt6_DIR\bin\windeployqt.exe") {
+            $windeployqt = "$env:Qt6_DIR\bin\windeployqt.exe"
+          } else {
+            # Search for windeployqt in the entire Qt directory
+            $qtRootDir = Split-Path -Parent "$env:Qt6_DIR"
+            $windeployqtFiles = Get-ChildItem -Path $qtRootDir -Filter windeployqt.exe -Recurse -ErrorAction SilentlyContinue
+            if ($windeployqtFiles.Count -gt 0) {
+              $windeployqt = $windeployqtFiles[0].FullName
+            }
+          }
+          
+          if ($windeployqt) {
             echo "Found windeployqt at: $windeployqt"
             & $windeployqt --release ModbusCrc.exe
           } else {
-            echo "ERROR: windeployqt.exe not found at expected location"
-            echo "Searching for windeployqt..."
-            Get-ChildItem -Path "$env:Qt6_DIR" -Filter windeployqt.exe -Recurse -ErrorAction SilentlyContinue | ForEach-Object { echo "Found at: $($_.FullName)" }
+            echo "ERROR: windeployqt.exe not found!"
+            echo "Contents of Qt installation:"
+            $qtRootDir = Split-Path -Parent "$env:Qt6_DIR"
+            Get-ChildItem -Path $qtRootDir -Recurse -Depth 2
           }
 
       - name: Package Application
