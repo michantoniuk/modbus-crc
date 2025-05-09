@@ -43,7 +43,7 @@ jobs:
           cd build
           cmake --build . --config Release
 
-      - name: Create standalone package
+      - name: Create initial package with dependencies
         run: |
           New-Item -Path "standalone" -ItemType Directory -Force
           Copy-Item "build\Release\ModbusCrc.exe" -Destination "standalone"
@@ -55,9 +55,42 @@ jobs:
           Copy-Item "$System32Path\vcruntime140.dll" -Destination "." -ErrorAction SilentlyContinue
           Copy-Item "$System32Path\vcruntime140_1.dll" -Destination "." -ErrorAction SilentlyContinue
 
-      - name: Upload standalone package
-        uses: actions/upload-artifact@v4
-        with:
-          name: ModbusCrc_Windows_Standalone
-          path: standalone\*
-          retention-days: 7
+      - name: Download Enigma Virtual Box
+        run: |
+          Invoke-WebRequest -Uri "https://enigmaprotector.com/assets/files/enigmavb.exe" -OutFile "enigmavb.exe"
+          Start-Process -FilePath "enigmavb.exe" -ArgumentList "/silent" -Wait
+
+      - name: Create single EXE with Enigma Virtual Box
+        run: |
+          # Utwórz plik projektu dla Enigma Virtual Box
+          $evbProject = @"
+  <enigmavb>
+  <process>standalone\ModbusCrc.exe</process>
+  <output>ModbusCrc_Single.exe</output>
+  <options>
+  <compress>true</compress>
+  <virtualization>true</virtualization>
+  </options>
+  <files>
+  <folder>standalone</folder>
+  </files>
+  </enigmavb>
+  "@
+          Set-Content -Path "evb_project.evb" -Value $evbProject
+  
+  # Uruchom Enigma Virtual Box z linii poleceń
+  & "C:\Program Files\Enigma Virtual Box\enigmavbconsole.exe" "evb_project.evb"
+
+- name: Upload single EXE
+  uses: actions/upload-artifact@v4
+  with:
+    name: ModbusCrc_Single_EXE
+    path: ModbusCrc_Single.exe
+    retention-days: 7
+
+- name: Upload standalone package (for backup)
+  uses: actions/upload-artifact@v4
+  with:
+    name: ModbusCrc_Windows_Standalone
+    path: standalone\*
+    retention-days: 7
