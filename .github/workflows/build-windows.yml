@@ -43,66 +43,22 @@ jobs:
           cd build
           cmake --build . --config Release
 
-      - name: Create initial package with dependencies
+      - name: Create standalone package with dependencies
         run: |
           New-Item -Path "standalone" -ItemType Directory -Force
           Copy-Item "build\Release\ModbusCrc.exe" -Destination "standalone"
           cd standalone
           & "$env:Qt6_DIR\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler --no-opengl-sw ModbusCrc.exe
           
+          # Kopiowanie bibliotek VC++ Runtime
           $System32Path = "$env:SystemRoot\System32"
           Copy-Item "$System32Path\msvcp140.dll" -Destination "." -ErrorAction SilentlyContinue
           Copy-Item "$System32Path\vcruntime140.dll" -Destination "." -ErrorAction SilentlyContinue
           Copy-Item "$System32Path\vcruntime140_1.dll" -Destination "." -ErrorAction SilentlyContinue
 
-      - name: Create Self-Extracting Archive with 7-Zip
-        run: |
-          # Utwórz plik wsadowy do uruchamiania aplikacji
-          $batchContent = @"
-  @echo off
-  start /wait ModbusCrc.exe
-  del /q run.bat
-  "@
-          Set-Content -Path "standalone\run.bat" -Value $batchContent
-  
-  # Utwórz plik konfiguracyjny dla SFX
-  $sfxConfigContent = @"
-  ;!@Install@!UTF-8!
-  RunProgram="run.bat"
-  GUIMode="2"
-  Silent="1"
-  ;!@InstallEnd@!
-  "@
-          Set-Content -Path "7zsd_config.txt" -Value $sfxConfigContent
-  
-  # Utwórz archiwum 7z z całym katalogiem standalone
-  & "C:\Program Files\7-Zip\7z.exe" a -r standalone.7z ./standalone/*
-  
-  # Pobierz moduł SFX 7-Zip
-  Invoke-WebRequest -Uri "https://raw.githubusercontent.com/chrislake/7zsfxmm/master/7zsd_All_x64.sfx" -OutFile "7zsd_All_x64.sfx"
-  
-  # Połącz moduł SFX, konfigurację i archiwum w jeden plik EXE
-  Get-Content -Path "7zsd_All_x64.sfx", "7zsd_config.txt", "standalone.7z" -ReadCount 0 -AsByteStream | Set-Content -Path "ModbusCrc_Single.exe" -AsByteStream
-  
-  # Sprawdź czy plik został utworzony
-  if (Test-Path "ModbusCrc_Single.exe") {
-  Write-Host "Pomyślnie utworzono ModbusCrc_Single.exe"
-  Get-Item "ModbusCrc_Single.exe" | Select-Object Length, LastWriteTime
-  } else {
-  Write-Host "Nie udało się utworzyć ModbusCrc_Single.exe"
-  exit 1
-  }
-
-- name: Upload single EXE
-  uses: actions/upload-artifact@v4
-  with:
-    name: ModbusCrc_Single_EXE
-    path: ModbusCrc_Single.exe
-    retention-days: 7
-
-- name: Upload standalone package (for backup)
-  uses: actions/upload-artifact@v4
-  with:
-    name: ModbusCrc_Windows_Standalone
-    path: standalone\*
-    retention-days: 7
+      - name: Upload standalone package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ModbusCrc_Windows_Standalone
+          path: standalone\*
+          retention-days: 7
