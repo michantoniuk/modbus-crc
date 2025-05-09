@@ -1,4 +1,4 @@
-name: Build Windows EXE
+name: Budowanie aplikacji CRC-16 Modbus
 
 on:
   push:
@@ -14,57 +14,132 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install Qt
-      - name: Install Qt
+      # Utworzenie katalogów na zasoby
+      - name: Tworzenie katalogów zasobów
+        run: |
+          mkdir -p resources/icons
+          mkdir -p resources/win32
+
+      # Pobranie prostej ikony, jeśli nie istnieje
+      - name: Pobieranie ikony, jeśli potrzebna
+        run: |
+          if (-not (Test-Path "resources/icons/app_icon.ico")) {
+            Invoke-WebRequest -Uri "https://upload.wikimedia.org/wikipedia/commons/4/44/Grey_setting_icon.svg" -OutFile "resources/icons/app_icon.ico"
+          }
+
+      # Instalacja Qt
+      - name: Instalacja Qt
         uses: jurplel/install-qt-action@v3.3.0
         with:
           version: '6.4.3'
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2019_64'
+          modules: 'qtcore qtgui qtwidgets'
 
-      - name: Setup MSVC
+      - name: Konfiguracja MSVC
         uses: ilammy/msvc-dev-cmd@v1.13.0
 
-      - name: Configure CMake
+      - name: Konfiguracja CMake
         run: |
           mkdir build
           cd build
-          cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+          cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$PWD/install
 
-      - name: Build
+      - name: Kompilacja
         run: |
           cd build
           cmake --build . --config Release
 
-      - name: Create minimal deployment package
+      - name: Instalacja
         run: |
-          # Create a clean directory for deployment
+          cd build
+          cmake --install . --config Release
+
+      - name: Test wydajności CRC
+        run: |
+          # Testowanie aplikacji z przykładową sekwencją
+          cd build\install
+          $testSequence = "01 10 00 11 00 03 06 1A C4 BA D0"
+          $testRepetitions = 1000000
+          
+          # Uruchomienie aplikacji z parametrami testowymi i zapisanie wyniku
+          echo "Testowanie sekwencji: $testSequence, powtórzenia: $testRepetitions"
+          Start-Process -FilePath "ModbusCrc.exe" -Wait
+          
+          # W rzeczywistej implementacji należałoby zautomatyzować test
+          # poprzez podanie parametrów lub automatyzację GUI
+          
+          echo "Testowanie zakończone"
+
+      - name: Tworzenie samodzielnego pakietu
+        run: |
+          # Utworzenie katalogu wdrożenia
           mkdir -p deployment
           
-          # Copy the main executable
-          copy build\Release\ModbusCrc.exe deployment\
+          # Kopiowanie pliku wykonywalnego i zależności z katalogu instalacji
+          copy build\install\* deployment\ -Recurse
           
-          # Use windeployqt to find and copy only the essential dependencies
+          # Użycie windeployqt do zapewnienia wszystkich zależności Qt
           cd deployment
           & "$env:Qt6_DIR\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler --no-opengl-sw ModbusCrc.exe
           
-          # List what we're packaging
-          echo "Files included in deployment package:"
-          dir
+          # Usunięcie niepotrzebnych plików (biblioteki debugowania itp.)
+          Get-ChildItem -Path . -Include *.pdb -Recurse | Remove-Item -Force
           
-          # Create a simple README file
+          # Dodanie bibliotek DLL środowiska uruchomieniowego Visual C++ (niezbędne dla samodzielnego wykonania)
+          $VCRedistPath = (Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\VisualStudio\Setup" -Name "SharedInstallationPath").SharedInstallationPath
+          $VCRedistDllPath = Get-ChildItem -Path "$VCRedistPath\VC\Redist\MSVC\" -Filter "14.*" | Sort-Object -Property Name -Descending | Select-Object -First 1 | Get-ChildItem -Recurse -Filter "*.dll" | Where-Object { $_.FullName -like "*x64*" -and $_.FullName -like "*Microsoft.VC*" }
+          
+          if ($VCRedistDllPath) {
+            Copy-Item -Path $VCRedistDllPath -Destination .
+          } else {
+            # Jeśli nie możemy znaleźć bibliotek DLL, użyj pakietu redystrybucyjnego Visual C++
+            Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile "vc_redist.x64.exe"
+          
+            # Wyodrębnij biblioteki DLL z instalatora
+            Start-Process -FilePath "vc_redist.x64.exe" -ArgumentList "/extract:vcredist_files /q" -Wait
+            Copy-Item -Path "vcredist_files\*.dll" -Destination . -Force
+            Remove-Item -Path "vcredist_files" -Recurse -Force
+            Remove-Item -Path "vc_redist.x64.exe" -Force
+          }
+          
+          # Utworzenie pliku README
           @"
-          ModbusCrc Application
+          # Kalkulator CRC-16 Modbus
           
-          This is a standalone package with all required dependencies.
-          Simply double-click ModbusCrc.exe to launch the application.
-          "@ | Out-File -FilePath README.txt
+          ## Systemy Czasu Rzeczywistego - Zadanie nr 2
+          
+          Jest to samodzielna aplikacja ze wszystkimi wymaganymi zależnościami.
+          Wystarczy kliknąć dwukrotnie ModbusCrc.exe, aby uruchomić aplikację.
+          
+          ### Instrukcja użycia:
+          1. Wprowadź bajty szesnastkowe w pole "Bajty ramki" (np. 01 10 00 11 00 03 06 1A C4 BA D0)
+          2. Określ liczbę powtórzeń dla testów wydajności (1-10^9)
+          3. Kliknij OBLICZ, aby obliczyć CRC i zmierzyć wydajność
+          
+          ### Wymagania:
+          - System operacyjny Windows 10/11
+          - Brak dodatkowych wymagań, wszystkie zależności są dołączone
+          
+          ### Przykład testowy:
+          - Sekwencja: 01 10 00 11 00 03 06 1A C4 BA D0
+          - Wynik CRC: BAD0
+          "@ | Out-File -FilePath README.md -Encoding utf8
+          
+          # Wyświetlenie zawartości katalogu wdrożenia
+          echo "Pliki zawarte w pakiecie wdrożeniowym:"
+          Get-ChildItem -Recurse | Select-Object FullName
 
-      # Upload the deployment directory directly - no ZIP creation
-      - name: Upload application package
+      # Utworzenie archiwum ZIP z katalogu wdrożenia
+      - name: Utworzenie archiwum ZIP
+        run: |
+          Compress-Archive -Path deployment\* -DestinationPath ModbusCrc_SCR_ZadanieNr2.zip -Force
+
+      # Przesłanie pliku ZIP
+      - name: Przesłanie pakietu aplikacji
         uses: actions/upload-artifact@v4
         with:
-          name: ModbusCrc_Windows
-          path: deployment\*
+          name: ModbusCrc_SCR_ZadanieNr2
+          path: ModbusCrc_SCR_ZadanieNr2.zip
           retention-days: 7

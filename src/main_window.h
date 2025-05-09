@@ -14,6 +14,10 @@ public:
 
     private slots:
         void calculateCRC();
+    void clearInputs();
+    void copyCRCToClipboard();
+    void showCRCContextMenu(const QPoint &pos);
+    void showCRCInfo();
 
 private:
     QLineEdit* frameInput;
