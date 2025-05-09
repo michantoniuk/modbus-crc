@@ -1,0 +1,54 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '6.4.3'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2019_64'
+          modules: 'core gui widgets'
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure CMake
+        run: |
+          mkdir build
+          cd build
+          cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: |
+          cd build
+          cmake --build . --config Release
+
+      - name: Deploy Qt dependencies
+        run: |
+          cd build\Release
+          windeployqt.exe --release ModbusCrc.exe
+
+      - name: Package Application
+        run: |
+          cd build
+          Compress-Archive -Path Release\* -DestinationPath ModbusCrc_Windows.zip
+
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ModbusCrc_Windows
+          path: build\ModbusCrc_Windows.zip
