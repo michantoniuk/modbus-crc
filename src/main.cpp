@@ -1,8 +1,6 @@
 #include "main_window.h"
 #include <QApplication>
 #include <QIcon>
-#include <QLocale>
-#include <QTranslator>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -10,30 +8,26 @@
 
 int main(int argc, char *argv[]) {
 #ifdef _WIN32
-    // Ustawienie priorytetu procesu na wysoki dla lepszej wydajności testów
+    // Set process priority to high for better benchmark performance
     SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
 #endif
 
-    // Inicjalizacja aplikacji
+    // Initialize application
     QApplication app(argc, argv);
 
-    // Ustawienie metadanych aplikacji
+    // Set application metadata
     app.setApplicationName("ModbusCrc");
     app.setApplicationDisplayName("Kalkulator CRC-16 Modbus");
     app.setApplicationVersion("1.0.0");
-    app.setOrganizationName("Projekt Studencki");
+    app.setOrganizationName("ModbusCrc");
 
-    // Ustawienie lokalizacji na polską
-    QLocale::setDefault(QLocale(QLocale::Polish, QLocale::Poland));
-    QLocale locale = QLocale::system();
+    // Set application icon
+    app.setWindowIcon(QIcon(":/icons/app_icon.svg"));
 
-    // Ustawienie ikony aplikacji z zasobów
-    app.setWindowIcon(QIcon(":/icons/app_icon.ico"));
-
-    // Utworzenie i wyświetlenie głównego okna
+    // Create and show main window
     MainWindow window;
     window.show();
 
-    // Uruchomienie pętli zdarzeń aplikacji
+    // Run application event loop
     return app.exec();
 }

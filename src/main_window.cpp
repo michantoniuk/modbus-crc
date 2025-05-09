@@ -21,7 +21,7 @@
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     setWindowTitle("Kalkulator CRC-16 Modbus RTU - SCR Zadanie 2");
     setMinimumSize(600, 350);
-    setWindowIcon(QIcon(":/icons/app_icon.ico"));
+    setWindowIcon(QIcon(":/icons/app_icon.svg"));
 
     QWidget* centralWidget = new QWidget(this);
     QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);

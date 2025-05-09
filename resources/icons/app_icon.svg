@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+    <rect width="60" height="60" x="2" y="2" rx="8" ry="8" fill="#4285f4" />
+    <text x="32" y="40" font-family="Arial" font-size="24" text-anchor="middle" fill="white">CRC</text>
+    <path d="M15,15 L49,15 L49,49 L15,49 Z" fill="none" stroke="white" stroke-width="2" />
+    <path d="M15,25 L49,25" stroke="white" stroke-width="1" />
+    <path d="M15,35 L49,35" stroke="white" stroke-width="1" />
+</svg>
