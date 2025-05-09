@@ -7,8 +7,10 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-# Enable release optimizations
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
+# Enable release optimizations for non-MSVC compilers
+if(NOT MSVC)
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
+endif()
 
 # Find Qt packages
 find_package(Qt6 COMPONENTS Core Gui Widgets REQUIRED)
@@ -53,8 +55,9 @@ add_executable(ModbusCrc
         ${RESOURCES}
 )
 
-# Add version info for Windows
-if(WIN32)
+# Add version info for Windows only if app_icon.ico exists
+if(WIN32 AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/app_icon.ico" AND
+        EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources/win32/app.rc.in")
     configure_file(
             ${CMAKE_CURRENT_SOURCE_DIR}/resources/win32/app.rc.in
             ${CMAKE_CURRENT_BINARY_DIR}/app.rc
@@ -85,16 +88,18 @@ if(WIN32)
     find_program(WINDEPLOYQT_EXECUTABLE windeployqt HINTS "${_qt_bin_dir}")
 
     # Add custom command to deploy Qt dependencies after build
-    add_custom_command(TARGET ModbusCrc POST_BUILD
-            COMMAND "${CMAKE_COMMAND}" -E
-            env PATH="${_qt_bin_dir}" "${WINDEPLOYQT_EXECUTABLE}"
-            --verbose 0
-            --no-translations
-            --no-system-d3d-compiler
-            --no-opengl-sw
-            --no-virtualkeyboard
-            --release
-            \"$<TARGET_FILE:ModbusCrc>\"
-            COMMENT "Deploying Qt dependencies..."
-    )
+    if(WINDEPLOYQT_EXECUTABLE)
+        add_custom_command(TARGET ModbusCrc POST_BUILD
+                COMMAND "${CMAKE_COMMAND}" -E
+                env PATH="${_qt_bin_dir}" "${WINDEPLOYQT_EXECUTABLE}"
+                --verbose 0
+                --no-translations
+                --no-system-d3d-compiler
+                --no-opengl-sw
+                --no-virtualkeyboard
+                --release
+                \"$<TARGET_FILE:ModbusCrc>\"
+                COMMENT "Deploying Qt dependencies..."
+        )
+    endif()
 endif()
