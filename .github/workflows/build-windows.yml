@@ -62,8 +62,8 @@ jobs:
 
       - name: Create single EXE with Enigma Virtual Box
         run: |
-          # Utwórz plik projektu dla Enigma Virtual Box
-          $evbContent = @'
+          # Przygotowanie pliku projektu EVB
+          $evbXML = @"
   <enigmavb>
   <process>standalone\ModbusCrc.exe</process>
   <output>ModbusCrc_Single.exe</output>
@@ -75,11 +75,13 @@ jobs:
   <folder>standalone</folder>
   </files>
   </enigmavb>
-  '@
-  Set-Content -Path "evb_project.evb" -Value $evbContent
+  "@
+
+          # Zapisanie pliku projektu z poprawną składnią
+          [System.IO.File]::WriteAllText("$PWD\evb_project.evb", $evbXML)
   
-  # Uruchom Enigma Virtual Box z linii poleceń
-  & "C:\Program Files\Enigma Virtual Box\enigmavbconsole.exe" "evb_project.evb"
+  # Uruchomienie EVB Console
+  & "C:\Program Files\Enigma Virtual Box\enigmavbconsole.exe" "$PWD\evb_project.evb"
 
 - name: Upload single EXE
   uses: actions/upload-artifact@v4
