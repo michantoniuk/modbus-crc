@@ -49,20 +49,11 @@ jobs:
           Copy-Item "build\Release\ModbusCrc.exe" -Destination "standalone"
           cd standalone
           & "$env:Qt6_DIR\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler --no-opengl-sw ModbusCrc.exe
-          $VCRedistPath = (Get-ChildItem "C:\Program Files (x86)\Microsoft Visual Studio\2019" -Recurse -Filter "vcruntime140.dll" | Select-Object -First 1).FullName
-          if ($VCRedistPath) {
-            Copy-Item $VCRedistPath -Destination "."
-            $VCRedistPath = (Get-ChildItem "C:\Program Files (x86)\Microsoft Visual Studio\2019" -Recurse -Filter "msvcp140.dll" | Select-Object -First 1).FullName
-            if ($VCRedistPath) {
-              Copy-Item $VCRedistPath -Destination "."
-            }
-          } else {
-            $VC_REDIST_URL = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
-            $VC_REDIST_PATH = "$env:TEMP\vc_redist.x64.exe"
-            Invoke-WebRequest -Uri $VC_REDIST_URL -OutFile $VC_REDIST_PATH
-            Start-Process -FilePath $VC_REDIST_PATH -ArgumentList "/extract:$env:TEMP\vc_redist_files /q" -Wait
-            Copy-Item "$env:TEMP\vc_redist_files\*.dll" -Destination "."
-          }
+          
+          $System32Path = "$env:SystemRoot\System32"
+          Copy-Item "$System32Path\msvcp140.dll" -Destination "." -ErrorAction SilentlyContinue
+          Copy-Item "$System32Path\vcruntime140.dll" -Destination "." -ErrorAction SilentlyContinue
+          Copy-Item "$System32Path\vcruntime140_1.dll" -Destination "." -ErrorAction SilentlyContinue
 
       - name: Upload standalone package
         uses: actions/upload-artifact@v4
