@@ -14,72 +14,62 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install Qt using the correct version and modules from the list
+      # Install Qt using the correct version from the list
       - name: Install Qt
         uses: jurplel/install-qt-action@v3.3.0
         with:
-          version: '6.4.3'  # This version is available according to the output
+          version: '6.4.3'
           host: 'windows'
           target: 'desktop'
-          arch: 'win64_msvc2019_64'  # This architecture is available
-          modules: 'qtcharts qtimageformats qtmultimedia'  # Using correct module names from the list
-
-      - name: Print Qt environment info
-        run: |
-          echo "Qt6_DIR: $env:Qt6_DIR"
-          dir "$env:Qt6_DIR"
+          arch: 'win64_msvc2019_64'
 
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1.13.0
 
-      - name: Configure CMake
+      - name: Configure CMake with static linking
         run: |
           mkdir build
           cd build
-          $QtPath = "$env:Qt6_DIR"
-          echo "Using Qt path: $QtPath"
-          cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$QtPath"
+          # Add options for static linking
+          cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
 
       - name: Build
         run: |
           cd build
           cmake --build . --config Release
 
-      - name: Deploy Qt dependencies
+      # Check if the app can be made standalone
+      - name: Create standalone EXE with windeployqt
         run: |
           cd build\Release
           
-          # Find windeployqt.exe
-          $windeployqt = $null
-          if (Test-Path "$env:Qt6_DIR\bin\windeployqt.exe") {
-            $windeployqt = "$env:Qt6_DIR\bin\windeployqt.exe"
-          } else {
-            # Search for windeployqt in the entire Qt directory
-            $qtRootDir = Split-Path -Parent "$env:Qt6_DIR"
-            $windeployqtFiles = Get-ChildItem -Path $qtRootDir -Filter windeployqt.exe -Recurse -ErrorAction SilentlyContinue
-            if ($windeployqtFiles.Count -gt 0) {
-              $windeployqt = $windeployqtFiles[0].FullName
-            }
-          }
+          # Create a clean directory for the standalone app
+          mkdir -p ..\..\standalone
+          copy ModbusCrc.exe ..\..\standalone\
+          cd ..\..\standalone
           
-          if ($windeployqt) {
-            echo "Found windeployqt at: $windeployqt"
-            & $windeployqt --release ModbusCrc.exe
-          } else {
-            echo "ERROR: windeployqt.exe not found!"
-            echo "Contents of Qt installation:"
-            $qtRootDir = Split-Path -Parent "$env:Qt6_DIR"
-            Get-ChildItem -Path $qtRootDir -Recurse -Depth 2
-          }
+          # Use windeployqt with --no-translations --no-system-d3d-compiler --no-opengl-sw to minimize files
+          & "$env:Qt6_DIR\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler --no-opengl-sw --no-virtualkeyboard --compiler-runtime ModbusCrc.exe
+          
+          # Try to consolidate DLLs with --qmldir option if it's a QML app
+          # & "$env:Qt6_DIR\bin\windeployqt.exe" --release --qmldir=..\src --no-translations ModbusCrc.exe
+          
+          # Check what files were created
+          dir
 
-      - name: Package Application
-        run: |
-          cd build
-          Compress-Archive -Path Release\* -DestinationPath ModbusCrc_Windows.zip
-
-      - name: Upload EXE artifact
+      # Upload just the EXE if it's fully standalone, otherwise upload minimal required files
+      - name: Upload standalone artifact
         uses: actions/upload-artifact@v4
         with:
           name: ModbusCrc_Windows
-          path: build\ModbusCrc_Windows.zip
+          path: standalone\ModbusCrc.exe
+          retention-days: 7
+
+      # Fallback to upload all required files if needed
+      - name: Upload full package if necessary
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ModbusCrc_Windows_Full
+          path: standalone\*
           retention-days: 7
