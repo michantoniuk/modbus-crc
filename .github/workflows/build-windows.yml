@@ -18,47 +18,41 @@ jobs:
         run: |
           if (-not (Test-Path "resources\icons")) { New-Item -Path "resources\icons" -ItemType Directory -Force }
           Invoke-WebRequest -Uri "https://raw.githubusercontent.com/feathericons/feather/master/icons/cpu.svg" -OutFile "resources\icons\app_icon.svg"
-          Set-Content -Path "resources\resources.qrc" -Value @'
-  <!DOCTYPE RCC>
-  <RCC version="1.0">
-  <qresource prefix="/">
-  <file>icons/app_icon.svg</file>
-  </qresource>
-  </RCC>
-  '@
+          $content = '<!DOCTYPE RCC><RCC version="1.0"><qresource prefix="/"><file>icons/app_icon.svg</file></qresource></RCC>'
+          Set-Content -Path "resources\resources.qrc" -Value $content
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v3.3.0
         with:
           version: '6.4.3'
-host: 'windows'
-target: 'desktop'
-arch: 'win64_msvc2019_64'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2019_64'
 
-- name: Setup MSVC
-  uses: ilammy/msvc-dev-cmd@v1.13.0
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1.13.0
 
-- name: Configure CMake
-  run: |
-    mkdir build
-    cd build
-    cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+      - name: Configure CMake
+        run: |
+          mkdir build
+          cd build
+          cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
 
-- name: Build
-  run: |
-    cd build
-    cmake --build . --config Release
+      - name: Build
+        run: |
+          cd build
+          cmake --build . --config Release
 
-- name: Create minimal deployment package
-  run: |
-    mkdir -p deployment
-    copy build\Release\ModbusCrc.exe deployment\
-    cd deployment
-    & "$env:Qt6_DIR\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler --no-opengl-sw ModbusCrc.exe
+      - name: Create minimal deployment package
+        run: |
+          mkdir -p deployment
+          copy build\Release\ModbusCrc.exe deployment\
+          cd deployment
+          & "$env:Qt6_DIR\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler --no-opengl-sw ModbusCrc.exe
 
-- name: Upload application package
-  uses: actions/upload-artifact@v4
-  with:
-    name: ModbusCrc_Windows
-    path: deployment\*
-    retention-days: 7
+      - name: Upload application package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ModbusCrc_Windows
+          path: deployment\*
+          retention-days: 7
