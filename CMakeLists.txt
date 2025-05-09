@@ -74,32 +74,47 @@ target_link_libraries(ModbusCrc PRIVATE
         Threads::Threads
 )
 
-# Install configuration
-install(TARGETS ModbusCrc
-        RUNTIME DESTINATION .
-        BUNDLE DESTINATION .
-)
-
-# Deploy Qt dependencies
+# Create a standalone executable package
 if(WIN32)
     # Get Qt deployment tool
     get_target_property(_qmake_executable Qt6::qmake IMPORTED_LOCATION)
     get_filename_component(_qt_bin_dir "${_qmake_executable}" DIRECTORY)
     find_program(WINDEPLOYQT_EXECUTABLE windeployqt HINTS "${_qt_bin_dir}")
 
-    # Add custom command to deploy Qt dependencies after build
-    if(WINDEPLOYQT_EXECUTABLE)
-        add_custom_command(TARGET ModbusCrc POST_BUILD
-                COMMAND "${CMAKE_COMMAND}" -E
-                env PATH="${_qt_bin_dir}" "${WINDEPLOYQT_EXECUTABLE}"
-                --verbose 0
-                --no-translations
-                --no-system-d3d-compiler
-                --no-opengl-sw
-                --no-virtualkeyboard
-                --release
-                \"$<TARGET_FILE:ModbusCrc>\"
-                COMMENT "Deploying Qt dependencies..."
-        )
-    endif()
+    # Create a custom target for packaging
+    add_custom_target(standalone_package
+            # First, make a clean deployment directory
+            COMMAND ${CMAKE_COMMAND} -E remove_directory "${CMAKE_BINARY_DIR}/standalone"
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/standalone"
+
+            # Copy our executable
+            COMMAND ${CMAKE_COMMAND} -E copy
+            "$<TARGET_FILE:ModbusCrc>"
+            "${CMAKE_BINARY_DIR}/standalone/"
+
+            # Run windeployqt to copy all dependencies
+            COMMAND ${WINDEPLOYQT_EXECUTABLE}
+            --release
+            --no-translations
+            --no-system-d3d-compiler
+            --no-opengl-sw
+            --no-virtualkeyboard
+            "${CMAKE_BINARY_DIR}/standalone/ModbusCrc.exe"
+
+            # Create a simple README file
+            COMMAND ${CMAKE_COMMAND} -E echo "ModbusCrc - Samodzielna aplikacja do obliczania CRC-16 Modbus" > "${CMAKE_BINARY_DIR}/standalone/README.txt"
+
+            DEPENDS ModbusCrc
+            COMMENT "Creating standalone package"
+    )
+
+    # Install standalone package
+    install(DIRECTORY "${CMAKE_BINARY_DIR}/standalone/"
+            DESTINATION .
+            COMPONENT standalone)
+else()
+    # On Linux, just install the executable
+    install(TARGETS ModbusCrc
+            RUNTIME DESTINATION bin
+            COMPONENT application)
 endif()
