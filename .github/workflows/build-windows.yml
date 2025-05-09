@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install Qt using the correct version from the list
+      # Install Qt
       - name: Install Qt
         uses: jurplel/install-qt-action@v3.3.0
         with:
@@ -26,50 +26,50 @@ jobs:
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1.13.0
 
-      - name: Configure CMake with static linking
+      - name: Configure CMake
         run: |
           mkdir build
           cd build
-          # Add options for static linking
-          cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
+          cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         run: |
           cd build
           cmake --build . --config Release
 
-      # Check if the app can be made standalone
-      - name: Create standalone EXE with windeployqt
+      - name: Create minimal deployment package
         run: |
-          cd build\Release
+          # Create a clean directory for deployment
+          mkdir -p deployment
           
-          # Create a clean directory for the standalone app
-          mkdir -p ..\..\standalone
-          copy ModbusCrc.exe ..\..\standalone\
-          cd ..\..\standalone
+          # Copy the main executable
+          copy build\Release\ModbusCrc.exe deployment\
           
-          # Use windeployqt with --no-translations --no-system-d3d-compiler --no-opengl-sw to minimize files
-          & "$env:Qt6_DIR\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler --no-opengl-sw --no-virtualkeyboard --compiler-runtime ModbusCrc.exe
+          # Use windeployqt to find and copy only the essential dependencies
+          cd deployment
+          & "$env:Qt6_DIR\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler --no-opengl-sw ModbusCrc.exe
           
-          # Try to consolidate DLLs with --qmldir option if it's a QML app
-          # & "$env:Qt6_DIR\bin\windeployqt.exe" --release --qmldir=..\src --no-translations ModbusCrc.exe
-          
-          # Check what files were created
+          # List what we're packaging
+          echo "Files included in deployment package:"
           dir
+          
+          # Create a simple README file
+          @"
+          ModbusCrc Application
+          
+          This is a standalone package with all required dependencies.
+          Simply double-click ModbusCrc.exe to launch the application.
+          "@ | Out-File -FilePath README.txt
 
-      # Upload just the EXE if it's fully standalone, otherwise upload minimal required files
-      - name: Upload standalone artifact
+      # Create a simple ZIP file with the minimal required files
+      - name: Create ZIP package
+        run: |
+          Compress-Archive -Path deployment\* -DestinationPath ModbusCrc_Windows.zip -Force
+
+      # Upload the ZIP
+      - name: Upload application package
         uses: actions/upload-artifact@v4
         with:
           name: ModbusCrc_Windows
-          path: standalone\ModbusCrc.exe
-          retention-days: 7
-
-      # Fallback to upload all required files if needed
-      - name: Upload full package if necessary
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ModbusCrc_Windows_Full
-          path: standalone\*
+          path: ModbusCrc_Windows.zip
           retention-days: 7
