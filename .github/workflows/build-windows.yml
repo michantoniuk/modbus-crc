@@ -14,31 +14,40 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # First, let's list available Qt versions with correct syntax
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11.9'
 
-      - name: Debug Python
+      - name: Install aqtinstall
         run: |
-          python --version
-          where python
-          echo %PATH%
+          python -m pip install --upgrade pip
+          pip install aqtinstall==2.1.*
 
+      - name: List available Qt versions
+        run: |
+          # List all available versions
+          python -m aqt list-qt windows desktop
+          # List architectures for Qt 6.5 (a known version)
+          python -m aqt list-qt windows desktop --arch 6.5.0
+          # List modules for Qt 6.5.0 on win64_msvc2019_64
+          python -m aqt list-qt windows desktop --modules 6.5.0 win64_msvc2019_64
+
+      # Now use the jurplel action with known good parameters
       - name: Install Qt
         uses: jurplel/install-qt-action@v3.3.0
         with:
-          version: '6.4.3'
+          version: '6.5.0'  # Using a version we know exists
           host: 'windows'
           target: 'desktop'
-          arch: 'win64_msvc2019_64'
-          modules: 'core gui widgets'
-          set-env: true
+          arch: 'win64_msvc2019_64'  # This should be available for Qt 6.5
+          modules: 'qtcore qtgui qtwidgets'  # Using correct module names
 
-      - name: Verify Qt Installation
+      - name: Print Qt environment info
         run: |
+          echo "Qt6_DIR: $env:Qt6_DIR"
           dir $env:Qt6_DIR
-          echo "Qt location: $env:Qt6_DIR"
 
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1.13.0
@@ -47,24 +56,32 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$env:Qt6_DIR
+          $QtPath = "$env:Qt6_DIR"
+          echo "Using Qt path: $QtPath"
+          cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$QtPath"
 
       - name: Build
         run: |
           cd build
-          cmake --build . --config Release --verbose
+          cmake --build . --config Release
 
       - name: Deploy Qt dependencies
         run: |
           cd build\Release
-          where windeployqt
-          windeployqt.exe --verbose --release ModbusCrc.exe
+          $windeployqt = "$env:Qt6_DIR\bin\windeployqt.exe"
+          if (Test-Path $windeployqt) {
+            echo "Found windeployqt at: $windeployqt"
+            & $windeployqt --release ModbusCrc.exe
+          } else {
+            echo "ERROR: windeployqt.exe not found at expected location"
+            echo "Searching for windeployqt..."
+            Get-ChildItem -Path "$env:Qt6_DIR" -Filter windeployqt.exe -Recurse -ErrorAction SilentlyContinue | ForEach-Object { echo "Found at: $($_.FullName)" }
+          }
 
       - name: Package Application
         run: |
           cd build
           Compress-Archive -Path Release\* -DestinationPath ModbusCrc_Windows.zip
-          dir ModbusCrc_Windows.zip
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
