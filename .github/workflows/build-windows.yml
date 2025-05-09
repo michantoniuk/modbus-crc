@@ -62,37 +62,64 @@ jobs:
 
       - name: Create single EXE with Enigma Virtual Box
         run: |
-          # Przygotowanie pliku projektu EVB
-          $evbXML = @"
-  <enigmavb>
-  <process>standalone\ModbusCrc.exe</process>
-  <output>ModbusCrc_Single.exe</output>
-  <options>
-  <compress>true</compress>
-  <virtualization>true</virtualization>
-  </options>
-  <files>
-  <folder>standalone</folder>
-  </files>
-  </enigmavb>
-  "@
+          # Tworzenie pliku projektu EVB linijka po linijce
+          $xml = New-Object System.Xml.XmlDocument
+          $declaration = $xml.CreateXmlDeclaration("1.0", "UTF-8", $null)
+          $xml.AppendChild($declaration) | Out-Null
+          
+          $root = $xml.CreateElement("enigmavb")
+          $xml.AppendChild($root) | Out-Null
+          
+          $process = $xml.CreateElement("process")
+          $process.InnerText = "standalone\ModbusCrc.exe"
+          $root.AppendChild($process) | Out-Null
+          
+          $output = $xml.CreateElement("output")
+          $output.InnerText = "ModbusCrc_Single.exe"
+          $root.AppendChild($output) | Out-Null
+          
+          $options = $xml.CreateElement("options")
+          $root.AppendChild($options) | Out-Null
+          
+          $compress = $xml.CreateElement("compress")
+          $compress.InnerText = "true"
+          $options.AppendChild($compress) | Out-Null
+          
+          $virtualization = $xml.CreateElement("virtualization")
+          $virtualization.InnerText = "true"
+          $options.AppendChild($virtualization) | Out-Null
+          
+          $files = $xml.CreateElement("files")
+          $root.AppendChild($files) | Out-Null
+          
+          $folder = $xml.CreateElement("folder")
+          $folder.InnerText = "standalone"
+          $files.AppendChild($folder) | Out-Null
+          
+          # Zapisanie pliku XML
+          $xml.Save("$PWD\evb_project.evb")
+          
+          # Uruchomienie Enigma Virtual Box Console
+          & "C:\Program Files\Enigma Virtual Box\enigmavbconsole.exe" "$PWD\evb_project.evb"
+          
+          # Sprawdź czy plik został utworzony
+          if (Test-Path "ModbusCrc_Single.exe") {
+            Write-Host "Pomyślnie utworzono ModbusCrc_Single.exe"
+          } else {
+            Write-Host "Nie udało się utworzyć ModbusCrc_Single.exe"
+            exit 1
+          }
 
-          # Zapisanie pliku projektu z poprawną składnią
-          [System.IO.File]::WriteAllText("$PWD\evb_project.evb", $evbXML)
-  
-  # Uruchomienie EVB Console
-  & "C:\Program Files\Enigma Virtual Box\enigmavbconsole.exe" "$PWD\evb_project.evb"
+      - name: Upload single EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: ModbusCrc_Single_EXE
+          path: ModbusCrc_Single.exe
+          retention-days: 7
 
-- name: Upload single EXE
-  uses: actions/upload-artifact@v4
-  with:
-    name: ModbusCrc_Single_EXE
-    path: ModbusCrc_Single.exe
-    retention-days: 7
-
-- name: Upload standalone package (for backup)
-  uses: actions/upload-artifact@v4
-  with:
-    name: ModbusCrc_Windows_Standalone
-    path: standalone\*
-    retention-days: 7
+      - name: Upload standalone package (for backup)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ModbusCrc_Windows_Standalone
+          path: standalone\*
+          retention-days: 7
