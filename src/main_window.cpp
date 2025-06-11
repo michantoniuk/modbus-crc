@@ -19,7 +19,6 @@
 #include <QAction>
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
-    setWindowTitle("Kalkulator CRC-16 Modbus RTU - SCR Zadanie 2");
     setMinimumSize(600, 350);
     setWindowIcon(QIcon(":/icons/app_icon.svg"));
 
@@ -27,7 +26,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
 
     // Informacja o zadaniu
-    QLabel* titleLabel = new QLabel("Systemy Czasu Rzeczywistego - Zadanie nr 2");
+    QLabel* titleLabel = new QLabel("Wyznaczanie CRC-16 zgodnie z Modbus RTU");
     QFont titleFont = titleLabel->font();
     titleFont.setBold(true);
     titleFont.setPointSize(titleFont.pointSize() + 2);
@@ -85,16 +84,11 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     buttonLayout->addWidget(clearButton);
     buttonLayout->addWidget(startButton);
 
-    // Informacja o realizacji zadania
-    QLabel* infoLabel = new QLabel("Realizacja zadania zgodnie ze specyfikacją protokołu MODBUS RTU");
-    infoLabel->setAlignment(Qt::AlignCenter);
-
     // Dodanie wszystkich elementów do głównego układu
     mainLayout->addWidget(titleLabel);
     mainLayout->addWidget(inputGroupBox);
     mainLayout->addWidget(resultsGroupBox);
     mainLayout->addLayout(buttonLayout);
-    mainLayout->addWidget(infoLabel);
 
     // Tworzenie paska statusu
     statusBar()->showMessage("Gotowy do obliczeń CRC");

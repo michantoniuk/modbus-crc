@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
 
     // Set application metadata
     app.setApplicationName("ModbusCrc");
-    app.setApplicationDisplayName("Kalkulator CRC-16 Modbus");
+    app.setApplicationDisplayName("Suma kontrolna CRC-16");
     app.setApplicationVersion("1.0.0");
     app.setOrganizationName("ModbusCrc");
 
